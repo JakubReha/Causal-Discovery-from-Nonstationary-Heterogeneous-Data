@@ -1,4 +1,4 @@
-function [Yg,Yl,Mg,Ml,D,eigValueg,eigValuel] = cd_non_con_fun(X,Y,c_indx,width,IF_GP)
+function [Yg,Yl,Mg,Ml,D,eigValueg,eigValuel] = cd_non_con_fun(X,Y,c_indx,width,widthT, IF_GP)
 % learn the nonstationary driving force of the causal mechanism
 % X: parents; Y; effect
 % width: the kernel width for X and Y
@@ -8,7 +8,7 @@ function [Yg,Yl,Mg,Ml,D,eigValueg,eigValuel] = cd_non_con_fun(X,Y,c_indx,width,I
 if(width==0)
     width = 0.1;
 end
-Wt = 1;  % the initial kernel width on C (or T). May need tunning for different data sets!!!
+Wt = widthT;  % the initial kernel width on C (or T). May need tunning for different data sets!!!
 [T,d] = size(X);
 X = X * diag(1./std(X));
 Y = Y/std(Y);

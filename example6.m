@@ -1,30 +1,24 @@
-% example 1: heterogeneous data (data from multiple domains)
-function [out] = example3(plot)
-arguments
-    plot = true
-end
-addpath(genpath(pwd))
-rng(10)
+function [out] = example6()
+rng(0)
 %% data generation
 % generate data from the first domain
-T_1 = 300;
+T_1 = 200;
 x1_1 = randn(T_1,1);
-x2_1 = 0.9*x1_1 + 0.6*randn(T_1,1);
-x3_1 = 0.9*x2_1 + 0.6*randn(T_1,1); 
-x4_1 = 0.9*x3_1 + 0.6*randn(T_1,1); 
+x2_1 = 0.5*x1_1 + 0.5*randn(T_1,1);
+x3_1 = linspace(0.5, 0, T_1)'.*x2_1 + 0.5*randn(T_1,1); 
+x4_1 = 0.5*randn(T_1,1)+1; 
 Data_1 = [x1_1,x2_1,x3_1,x4_1];
 
 % generate data from the second domain
-T_2 = 300;
+T_2 = 400;
 x1_2 = randn(T_2,1);
-x2_2 = sin(x1_2) + 0.2*randn(T_2,1);
-x3_2 = sin(x2_2) + 0.2*randn(T_2,1); 
-x4_2 = sin(x3_2) + 0.2*randn(T_2,1); 
+x3_2 = 0.5*randn(T_2,1);
+x2_2 = 0.5*x1_2 + 0.5*randn(T_2,1) + [linspace(0, 2, T_2/2), 2*ones(1, T_2/2)]'.*x3_2;
+x4_2 = 0.5*randn(T_2,1)+1; 
 Data_2 = [x1_2,x2_2,x3_2,x4_2];
 
 % concateneate data from the two domains
 Data = [Data_1;Data_2];
-
 
 
 %% set the parameters
@@ -47,21 +41,22 @@ end
 pars.pairwise = false;
 pars.bonferroni = false;
 pars.if_GP1 = IF_GP; % for conditional independence test
-pars.if_GP2 = 0;  % for direction determination with independent change principle & nonstationary driving force visualization
+pars.if_GP2 = 1;  % for direction determination with independent change principle & nonstationary driving force visualization
 pars.width = 0.4; % kernel width on observational variables (except the time index). If it is 0, then use the default kernel width when IF_GP = 0
-pars.widthT = 0; % the kernel width on the time index; set it to zero for domain-varying data
+pars.widthT = 0.1; % the kernel width on the time index; set it to zero for domain-varying data
 c_indx = [ones(1,T_1),2*ones(1,T_2)]'; % surrogate variable to capture the distribution shift; 
                  %here it is the doamin index, because the data is from multiple domains
 c_indx = [1:T_1 + T_2]';
 
 % custom modification
 plots.gt = true;
-plots.plot = plot;
+plots.plot = true;
 plots.driving_force = zeros(4, T_1 + T_2);
 
-for i = 1:4
-    plots.driving_force(i, :) = [ones(1,T_1),2*ones(1,T_2)]';
-end
+
+plots.driving_force(3, :) = 5*[linspace(0.5, 0, T_1),zeros(1, T_2/2), zeros(1, T_2/2)];
+plots.driving_force(2, :) = 5*[zeros(1, T_1),linspace(0, 2, T_2/2), 2*ones(1, T_2/2)];
+
 
 Type = 0; 
 % If Type=0, run all phases of CD-NOD (including 

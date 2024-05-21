@@ -1,4 +1,4 @@
-function [g_skeleton, g_inv, gns, SP, x_id_save, pa_id_save, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(X,cond_ind_test,c_indx,maxFanIn,alpha, Type, pars, plots)
+function [g_skeleton, g_inv, gns, SP, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(X,cond_ind_test,c_indx,maxFanIn,alpha, Type, pars, plots)
 % Constraint-based causal Discovery from Nonstationary/heterogeneous Data
 % (CD-NOD)
 % INPUT:
@@ -227,15 +227,10 @@ end
 % different from the ground truth
 if(Type==0)
     cmodule_id = find(gns(n,:)==1); % variable id with changing modules
-    if(length(cmodule_id)<1)
-        disp("CMODULE ZERO LENGTH")
-        disp(gns)
-    end
     for i = 1:length(cmodule_id)
         x_id = cmodule_id(i);
         pa_id = find(gns(1:n-1,x_id)==1)';
-        [Yg,Yl,Mg,Ml,D,eigValueg,eigValuel] = cd_non_con_fun(X(:,pa_id),X(:,x_id),c_indx,pars.width,pars.widthT, pars.if_GP2);
-        
+        [Yg,Yl,Mg,Ml,D,eigValueg,eigValuel] = cd_non_con_fun(X(:,pa_id),X(:,x_id),c_indx,pars.width,pars.if_GP2);
         Yg_save{i} = Yg;
         Yl_save{i} = Yl;
         Mg_save{i} = Mg;
@@ -243,13 +238,10 @@ if(Type==0)
         D_save{i} = D;
         eigValueg_save{i} = eigValueg;
         eigValuel_save{i} = eigValuel;
-        x_id_save{i} = x_id;
-        pa_id_save{i} = pa_id;
-
         if(plots.plot)
             figure, subplot(211),plot(Yg(:,1),'b'); hold on; plot(Yg(:,2),'k--');
             if(plots.gt)
-                hold on ; plot(plots.driving_force(x_id, 1:T));
+                hold on ; plot(plots.driving_force{x_id}(1:T));
                 legend(['First component of \lambda_i (eigenvalue: ' num2str(eigValueg(1)) ')'],['Second component of \lambda_i (eigenvalue: ' num2str(eigValueg(2)) ')'], ['Ground Truth']);
             else
                    legend(['First component of \lambda_i (eigenvalue: ' num2str(eigValueg(1)) ')'],['Second component of \lambda_i (eigenvalue: ' num2str(eigValueg(2)) ')']);

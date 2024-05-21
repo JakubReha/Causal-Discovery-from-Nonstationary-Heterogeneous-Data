@@ -1,0 +1,4 @@
+plots
+*.pdf
+*.png
+.DS_Store

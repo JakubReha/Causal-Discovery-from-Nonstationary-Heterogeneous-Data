@@ -1,7 +1,11 @@
+function [out] = example2(plot)
+arguments
+    plot = true
+end
 % example 2: nonstationary data
-clear all,clc,close all
 addpath(genpath(pwd))
 rng(10)
+
 
 % x1->x2->x3, and the causal module of x1, x2, and x3 are nonstationary,
 % and the causal modules change independently
@@ -10,8 +14,17 @@ load smooth_module
 T = 500;
 x1 = 0.5*randn(T,1) + 5*R0{1}(1:T); 
 x2 = 0.8*x1 + 4*R0{2}(1:T) + 0.5*randn(T,1);
-x3 = 6*R0{6}(1:T)+ 0.8*x2 + 0.3*randn(T,1); 
+x3 = 6*R0{6}(1:T)+ 0.8*x2 + 0.3*randn(T,1);
 Data = [x1,x2,x3];
+
+
+% custom modification
+plots.gt = true;
+plots.plot = plot;
+plots.driving_force = zeros(3, T);
+plots.driving_force(1, :) = 5*R0{1}(1:T)';
+plots.driving_force(2, :) = 4*R0{2}(1:T)';
+plots.driving_force(3, :) = 6*R0{6}(1:T)';
 
 %% set the parameters
 alpha = 0.05; % signifcance level of independence test
@@ -47,5 +60,26 @@ Type = 0;
 % If Type = 3, only perform phase 1
 
 %% run CD-NOD
-[g_skeleton, g_inv, gns, SP] = nonsta_cd_new(Data, cond_ind_test, c_indx, maxFanIn, alpha, Type, pars);
+[g_skeleton, g_inv, gns, SP, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(Data, cond_ind_test, c_indx, maxFanIn, alpha, Type, pars, plots);
+
+out.gns = gns;
+out.g_inv = g_inv;
+out.c_indx = c_indx;
+out.Yg_save = Yg_save;
+out.Yl_save = Yl_save;
+out.Mg_save = Mg_save;
+out.Ml_save = Ml_save;
+out.D_save = D_save;
+out.eigValueg_save = eigValueg_save;
+out.eigValuel_save = eigValuel_save;
+out.driving_force = plots.driving_force;
+
+%figure, subplot(211),plot(R0{6}(1:T),'b');
+%title('x3')
+
+%figure, subplot(211),plot(R0{1}(1:T),'b');
+%title('x1')
+
+%figure, subplot(211),plot(R0{2}(1:T),'b');
+%title('x2')
 
