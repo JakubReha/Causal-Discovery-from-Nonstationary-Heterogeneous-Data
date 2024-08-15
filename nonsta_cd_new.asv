@@ -1,9 +1,10 @@
-function [g_skeleton, g_inv, gns, SP, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(X,cond_ind_test,c_indx,maxFanIn,alpha, Type, pars, plots)
+function [g_skeleton, g_inv, gns, SP, x_id_save, pa_id_save, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(X,max_lag,cond_ind_test,c_indx,maxFanIn,alpha, Type, pars, plots)
 % Constraint-based causal Discovery from Nonstationary/heterogeneous Data
 % (CD-NOD)
 % INPUT:
 %       X: - T*n matrix. T is number of data points and n is the number
 %               of observed variables
+%       max_l: is the maximum lag
 %       cond_ind_test: - function handle that computes p-values for X ind. Y given Z:
 %                 (p_val = cond_ind_test(X, Y, Z, pars))
 %       c_indx: surrogate variable to capture the distribution shift. If
@@ -75,7 +76,21 @@ if ~isfield(pars,'if_GP2')
     pars.if_GP2 = 1;
 end
 
+X_new = [];
+n_var = size(X, 2);
+for i= 0:max_lag
+    temp = circshift(X, i, 1);
+    X_new = [temp(max_lag+1:end, :), X_new];
+end
+
+
+X = X_new;
+% .. X(i,t-1) .. X(j,t-1), X(i,t) .. X(j,t)
+
+c_indx = c_indx(max_lag+1:end, :); % KUBA: is it a problem that the c_indx doesnt start from zero????
 X=[X,c_indx]; % concatenate the surrogate variable C with others
+
+% Kuba, why should we normalize the data over the time domain? Don't we lose some information?
 X=X-repmat(mean(X),size(X,1),1);
 X=X*diag(1./std(X));
 
@@ -91,10 +106,79 @@ g = eye(n) - ones(n,n);
 % witness set
 witness = zeros(n,n,n);
 
-count =0;
-% find graph skeleton by CPC
+
+count=0;
+% step 1: X_i,t | C
+j = n;
 for s=0:maxFanIn % iteratively increase size of conditioning set
-    for i=1:n
+    % Kuba test all timestep t nodes except for C against C and remove also
+    % lagged edges
+    for i=n-n_var:n-1
+        % nodes adjacent to i
+        adjSet = find(g(i,:)~=0);
+        if (length(adjSet)<=s)
+            continue;
+        end
+        if (g(i,j)==0)
+            continue;
+        end
+        if (s==0)
+            p_val = feval(cond_ind_test, X(:,i), X(:,j), [], pars);
+            count=count+1;
+            SP{count}=strcat('i=', int2str(i),', j=',int2str(j),', pval=',num2str(p_val));
+            if  p_val > alpha
+                fprintf('%d ind %d with p-value %d\n', i,j,p_val);
+                k = i;
+                % if X_i,t is independent of C then this holds for all its
+                % lagged variables X_i,t-l (where l = 1 .. max_lag)
+                while k > 0
+                    g(k,j)=0;
+                    g(j,k)=0;
+                    k = k - n_var;
+                end
+            else
+                fprintf('%d notind %d with p-value %d\n', i,j,p_val);
+            end
+            continue;
+        end
+        % conditional independence test
+        combs = nchoosek(adjSet(adjSet~=j),s);
+        for k=1:size(combs,1)
+            condSet = combs(k,:);
+            % if independent
+            condSet_string='{';
+            for i2=1:(length(condSet)-1)
+                condSet_string=[condSet_string,int2str(condSet(i2)),', '];
+            end
+            condSet_string=[condSet_string,int2str(condSet(length(condSet))),'}'];
+            p_val = feval(cond_ind_test, X(:,i), X(:,j), X(:,condSet), pars);
+            count=count+1;
+            SP{count}=strcat('i=',int2str(i),', j=',int2str(j),', condSet_string=',condSet_string,', pval=',num2str(p_val));
+            if p_val > alpha
+                fprintf('%d ind %d | %s with p-value %d\n', i,j,condSet_string, p_val);
+                kk = i;
+                % if X_i,t is independent of C then this holds for all its
+                % lagged variables X_i,t-l (where l = 1 .. max_lag)
+                while kk > 0
+                    g(kk,j)=0;
+                    g(j,kk)=0;
+                    witness(kk,j,condSet) = ones(1,s);
+                    witness(j,kk,condSet) = ones(1,s);
+                    kk = kk - n_var;
+                end
+                break
+            else
+                fprintf('%d notind %d | %s with p-value %d\n', i,j,condSet_string, p_val);
+            end
+        end
+    end
+end
+
+% find graph skeleton by CPC
+% Kuba TODO: only test the edges where at least one node is non-lagged (i).
+% When deleting edges also delete the identical ones from the past (between lagged nodes)
+for s=0:maxFanIn  % iteratively increase size of conditioning set
+    for i=n-n_var:n-1
         % nodes adjacent to i
         adjSet = find(g(i,:)~=0);
         if (length(adjSet)<=s)
@@ -102,6 +186,13 @@ for s=0:maxFanIn % iteratively increase size of conditioning set
         end
         % test whether i ind j | s
         for j=adjSet
+            if (g(i,j)==0)
+                continue;
+            end
+            % Kuba: cut it in half
+            %if j > i
+            %   continue
+            %end
             % unconditional test
             if (s==0)
                 p_val = feval(cond_ind_test, X(:,i), X(:,j), [], pars);
@@ -109,8 +200,16 @@ for s=0:maxFanIn % iteratively increase size of conditioning set
                 SP{count}=strcat('i=', int2str(i),', j=',int2str(j),', pval=',num2str(p_val));
                 if  p_val > alpha
                     fprintf('%d ind %d with p-value %d\n', i,j,p_val);
-                    g(i,j)=0;
-                    g(j,i)=0;
+                    k = i;
+                    kk = j;
+                    % if X_i,t is independent of C then this holds for all its
+                    % lagged variables X_i,t-l (where l = 1 .. max_lag)
+                    while (k > 0 & kk > 0)
+                        g(k,kk)=0;
+                        g(kk,k)=0;
+                        k = k - n_var;
+                        kk = kk - n_var;
+                    end
                 else
                     fprintf('%d notind %d with p-value %d\n', i,j,p_val);
                 end
@@ -132,10 +231,19 @@ for s=0:maxFanIn % iteratively increase size of conditioning set
                 SP{count}=strcat('i=',int2str(i),', j=',int2str(j),', condSet_string=',condSet_string,', pval=',num2str(p_val));
                 if p_val > alpha
                     fprintf('%d ind %d | %s with p-value %d\n', i,j,condSet_string, p_val);
-                    witness(i,j,condSet) = ones(1,s);
-                    witness(j,i,condSet) = ones(1,s);
-                    g(i,j)=0;
-                    g(j,i)=0;
+                    k = i;
+                    kk = j;
+                    % if X_i,t is independent of C then this holds for all its
+                    % lagged variables X_i,t-l (where l = 1 .. max_lag)
+                    while (k > 0 & kk > 0)
+                        g(k,kk)=0;
+                        g(kk,k)=0;
+                        witness(k,kk,condSet) = ones(1,s);
+                        witness(kk,k,condSet) = ones(1,s);
+                        k = k - n_var;
+                        kk = kk - n_var;
+                    end
+                    break
                 else
                     fprintf('%d notind %d | %s with p-value %d\n', i,j,condSet_string, p_val);
                 end
@@ -144,13 +252,32 @@ for s=0:maxFanIn % iteratively increase size of conditioning set
     end
 end
 g_skeleton = g; % the causal skeleton over observed variables and C
+%% phase 1.5: Orient lagged edges
+if(Type<=2)
+    g(n,find(g(n,:)~=0)) = 1;
+    g(find(g(:,n)~=0),n) = 0;
+    adjMatrix = g;
+    for i=1:n-1
+        adj = find(adjMatrix(:,i)~=0);
+        i_lag = (i - 1 - mod(i - 1,n_var)) / n_var;
+        for k=1:size(adj, 1)
+            k_lag = (adj(k) - 1 - mod(adj(k) - 1,n_var)) / n_var;
+            if (k_lag > i_lag)
+               g(i, adj(k))= 1;
+               g(adj(k), i)= 0;
+            end
+            if (i_lag > k_lag)
+               g(adj(k), i) = 1;
+               g(i, adj(k)) = 0;
+            end
+        end
+    end
+end
 
 
 %% phase 2: infer causal directions by generalizaion of invariance
 % infer causal direction: C - X => C -> X
 if(Type<=2)
-    g(n,find(g(n,:)~=0)) = 1;
-    g(find(g(:,n)~=0),n) = 0;
     % infer V-structures: X - Y - Z  => X -> Y <- Z
     adjMatrix = g;
     for i=1:n-1
@@ -224,13 +351,18 @@ end
 %% Phase 4: nonstationary driving force estimation
 % visualize a low dimensional change of the causal module
 % note that here we only concern the variability, but the scale can be
-% different from the ground truth
+% different from the ground truthn n 
 if(Type==0)
     cmodule_id = find(gns(n,:)==1); % variable id with changing modules
+    if(length(cmodule_id)<1)
+        disp("CMODULE ZERO LENGTH")
+        disp(gns)
+    end
     for i = 1:length(cmodule_id)
         x_id = cmodule_id(i);
         pa_id = find(gns(1:n-1,x_id)==1)';
-        [Yg,Yl,Mg,Ml,D,eigValueg,eigValuel] = cd_non_con_fun(X(:,pa_id),X(:,x_id),c_indx,pars.width,pars.if_GP2);
+        [Yg,Yl,Mg,Ml,D,eigValueg,eigValuel] = cd_non_con_fun(X(:,pa_id),X(:,x_id),c_indx,pars.width,pars.widthT, pars.if_GP2);
+        
         Yg_save{i} = Yg;
         Yl_save{i} = Yl;
         Mg_save{i} = Mg;
@@ -238,10 +370,13 @@ if(Type==0)
         D_save{i} = D;
         eigValueg_save{i} = eigValueg;
         eigValuel_save{i} = eigValuel;
+        x_id_save{i} = x_id;
+        pa_id_save{i} = pa_id;
+
         if(plots.plot)
             figure, subplot(211),plot(Yg(:,1),'b'); hold on; plot(Yg(:,2),'k--');
             if(plots.gt)
-                hold on ; plot(plots.driving_force{x_id}(1:T));
+                hold on ; plot(plots.driving_force(x_id, 1:T));
                 legend(['First component of \lambda_i (eigenvalue: ' num2str(eigValueg(1)) ')'],['Second component of \lambda_i (eigenvalue: ' num2str(eigValueg(2)) ')'], ['Ground Truth']);
             else
                    legend(['First component of \lambda_i (eigenvalue: ' num2str(eigValueg(1)) ')'],['Second component of \lambda_i (eigenvalue: ' num2str(eigValueg(2)) ')']);

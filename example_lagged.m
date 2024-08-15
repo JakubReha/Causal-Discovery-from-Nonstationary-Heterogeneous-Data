@@ -1,16 +1,23 @@
-% example 4
+% example lagged
 % variables with multi-dimensionals
 % non-stationary data
-function [out] = example4()
+function [out] = example_lagged()
 rng(0)
 % x1->x2->x3->x4, and the causal modules of x2 and x4 is nonstationary, and
 % their changes are related 
 T = 500;
-x1 = randn(T,2); % 2 dimension
-x2 = 0.6*x1 + 2*sin([1:T]'/50) + 0.5*randn(T,2); % 2 dimension
-x3 = x2*[0.3;0.3] + 0.5*randn(T,1); % 1 dimension
-x4 = 0.8*x3 + (sin([1:T]'/50)+sin([1:T]'/20)) + 0.5*randn(T,1);  % 1 dimension
-Data = [x1,x2,x3,x4];
+x1 =randn(T, 1);
+x2 =randn(T, 1);
+x3 =randn(T, 1);
+x4 =randn(T, 1);
+
+for i = 3:T
+    x1(i) = randn(1); % 2 dimension
+    x2(i) = 0.6*x1(i) + 0.5*x2(i-1) + 0.5*randn(1); % 2 dimension
+    x3(i) = 0.3*x2(i)+ 0.5*x2(i-2) + 0.5*randn(1); % 1 dimension
+    x4(i) = 0.8*x4(i - 1) + 0.8*x3(i) + 0.5*x2(i-1) + 0.5*randn(1);  % 1 dimension
+end
+Data = [x2,x3,x4];
 
 
 %% set the parameters
@@ -56,8 +63,11 @@ plots.driving_force(2, :) = [2*sin([1:T]/50)];
 plots.driving_force(4, :) = [(sin([1:T]/50)+sin([1:T]/20))];
 
 %% run CD-NOD
-[g_skeleton, g_inv, gns, SP, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(Data, 3, cond_ind_test, c_indx, maxFanIn, alpha, Type, pars, plots);
+[g_skeleton, g_inv, gns, SP, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(Data, 2, cond_ind_test, c_indx, maxFanIn, alpha, Type, pars, plots);
 
+disp(gns)
+disp(g_skeleton)
+disp(g_inv)
 
 out.gns = gns; 
 out.c_indx = c_indx;
@@ -69,4 +79,3 @@ out.D_save = D_save;
 out.eigValueg_save = eigValueg_save;
 out.eigValuel_save = eigValuel_save;
 out.driving_force = plots.driving_force;
-
