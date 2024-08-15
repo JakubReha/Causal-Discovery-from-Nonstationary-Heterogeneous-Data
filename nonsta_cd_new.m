@@ -353,23 +353,7 @@ end
 %% Phase 4: nonstationary driving force estimation
 % visualize a low dimensional change of the causal module
 % note that here we only concern the variability, but the scale can be
-<<<<<<< Updated upstream
 % different from the ground truthn n 
-=======
-% different from the ground truth
-
-
-Yg_save ={};
-Yl_save ={};
-Mg_save ={};
-Ml_save ={};
-D_save ={};
-eigValueg_save ={};
-eigValuel_save ={};
-x_id_save ={};
-pa_id_save ={};
-
->>>>>>> Stashed changes
 if(Type==0)
     cmodule_id = find(gns(n,:)==1); % variable id with changing modules
     if(length(cmodule_id)<1)
