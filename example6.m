@@ -69,7 +69,7 @@ Type = 0;
 % If Type = 3, only perform phase 1
 
 %% run CD-NOD
-[g_skeleton, g_inv, gns, SP, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(Data, cond_ind_test, c_indx, maxFanIn, alpha, Type, pars, plots);
+[g_skeleton, g_inv, gns, SP, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(Data, cond_ind_test, c_indx, maxFanIn, alpha, Type, pars, plots, true);
 
 
 out.gns = gns;

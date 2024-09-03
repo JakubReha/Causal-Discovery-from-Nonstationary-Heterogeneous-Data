@@ -1,4 +1,4 @@
-function [g_skeleton, g_inv, gns, SP, x_id_save, pa_id_save, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(X,max_lag,cond_ind_test,c_indx,maxFanIn,alpha, Type, pars, plots)
+function [g_skeleton, g_inv, gns, SP, x_id_save, pa_id_save, Yg_save,Yl_save,Mg_save,Ml_save,D_save,eigValueg_save,eigValuel_save] = nonsta_cd_new(X,max_lag,cond_ind_test,c_indx,maxFanIn,alpha, Type, pars, plots, cd_nots)
 % Constraint-based causal Discovery from Nonstationary/heterogeneous Data
 % (CD-NOD)
 % INPUT:
@@ -118,6 +118,10 @@ for s=0:maxFanIn % iteratively increase size of conditioning set
     for i=n-n_var:n-1
         % nodes adjacent to i
         adjSet = find(g(i,:)~=0);
+        % The only difference between CD-NOD and CD-NOTS
+        if ~cd_nots
+            adjSet = adjSet(adjSet > (n - 1 - n_var));
+        end
         if (length(adjSet)<=s)
             continue;
         end
@@ -256,6 +260,7 @@ end
 g_skeleton = g; % the causal skeleton over observed variables and C
 %% phase 1.5: Orient lagged edges
 if(Type<=2)
+    % infer causal direction: C - X => C -> X
     g(n,find(g(n,:)~=0)) = 1;
     g(find(g(:,n)~=0),n) = 0;
     adjMatrix = g;
@@ -264,7 +269,11 @@ if(Type<=2)
         i_lag = (i - 1 - mod(i - 1,n_var)) / n_var;
         for k=1:size(adj, 1)
             k_lag = (adj(k) - 1 - mod(adj(k) - 1,n_var)) / n_var;
+            if (k == n)
+                k_lag = 0;
+            end 
             if (k_lag > i_lag)
+                % Kuba TODO: this needs to be checked
                g(i, adj(k))= 1;
                g(adj(k), i)= 0;
             end
@@ -278,7 +287,6 @@ end
 
 
 %% phase 2: infer causal directions by generalizaion of invariance
-% infer causal direction: C - X => C -> X
 if(Type<=2)
     % infer V-structures: X - Y - Z  => X -> Y <- Z
     adjMatrix = g;
